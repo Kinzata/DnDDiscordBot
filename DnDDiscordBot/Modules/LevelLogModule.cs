@@ -26,6 +26,7 @@ namespace DnDDiscordBot.Modules
         }
 
         [Command("recordLevelLog")]
+        [RequireRole("Moderator")]
         [Summary("Read level log messages and write parsed data to a local file.")]
         public Task ReadLogAsync()
         {
@@ -46,6 +47,7 @@ namespace DnDDiscordBot.Modules
         }
 
         [Command("recordLevelLogDb")]
+        [RequireRole("Moderator")]
         [Summary("Read level log messages and write parsed data to the database.")]
         public Task ReadLogAsyncDb()
         {
