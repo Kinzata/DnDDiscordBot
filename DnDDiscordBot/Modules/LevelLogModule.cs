@@ -1,6 +1,5 @@
 ﻿using Discord;
 using Discord.Commands;
-using Discord.WebSocket;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.PreConditions;
 using DnDDiscordBot.Services;
@@ -12,6 +11,7 @@ using System.Threading.Tasks;
 namespace DnDDiscordBot.Modules
 {
     [Group("timbly")]
+    [Alias("tim", "registry")]
     public class LevelLogModule : ModuleBase<SocketCommandContext>
     {
         private readonly LevelLogService _levelLogService;
@@ -26,7 +26,7 @@ namespace DnDDiscordBot.Modules
         }
 
         [Command("recordLevelLog")]
-        [Summary("Browse through a solid chunk of the level log data, adding things that were missed to the record local file.")]
+        [Summary("Read level log messages and write parsed data to a local file.")]
         public Task ReadLogAsync()
         {
             var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, 300);
@@ -46,7 +46,7 @@ namespace DnDDiscordBot.Modules
         }
 
         [Command("recordLevelLogDb")]
-        [Summary("Browse through a solid chunk of the level log data, adding things that were missed to the record databse.")]
+        [Summary("Read level log messages and write parsed data to the database.")]
         public Task ReadLogAsyncDb()
         {
             var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, 300);
@@ -69,27 +69,10 @@ namespace DnDDiscordBot.Modules
             return Task.CompletedTask;
         }
 
-        [Command("serverCharacters")]
-        [Summary("")]
-        public Task ServerCharacters()
-        {
-            var channel = Context.Channel;
-
-            var sb = new StringBuilder();
-            foreach( var log in _levelLogService.GetSortedLevelLogs())
-            {
-                var message = log.ToStringSafe();
-                sb.Append(message + "\n");
-            }
-
-            channel.SendMessageAsync(sb.ToString());
-
-            return Task.CompletedTask;
-        }
-
         [Command("characters")]
+        [Alias("c", "char", "chars", "character")]
         [RequireRole("DM")]
-        [Summary("")]
+        [Summary("Retrieve all character data and display as an embed.")]
         public async Task ServerCharactersDb()
         {
             var channel = Context.Channel;
@@ -154,12 +137,13 @@ namespace DnDDiscordBot.Modules
         }
 
         [Command("characters")]
-        [Summary("Retrieve a specific character's data.")]
-        public Task GetCharacterByName(string name)
+        [Alias("c", "char", "chars", "character")]
+        [Summary("Retrieve a specific character's data and display as an embed")]
+        public Task GetCharacterByName(string characterName)
         {
             var channel = Context.Channel;
 
-            var result = _dynamoService.GetCharacterData(name).Result;
+            var result = _dynamoService.GetCharacterData(characterName).Result;
 
             if( result != null)
             {
@@ -177,14 +161,15 @@ namespace DnDDiscordBot.Modules
             }
             else
             {
-                channel.SendMessageAsync($"No character named \"{name}\" found.");
+                channel.SendMessageAsync($"No character named \"{characterName}\" found.");
             }
 
             return Task.CompletedTask;
         }
 
         [Command("characters")]
-        [Summary("Retrieve a specific user's character data.")]
+        [Alias("c", "char", "chars", "character")]
+        [Summary("Retrieve a specific user's character data and display as an embed.")]
         public Task GetCharacterByUser(IUser user)
         {
             var channel = Context.Channel;
@@ -217,9 +202,9 @@ namespace DnDDiscordBot.Modules
         [Command("delete")]
         [RequireRole("Moderator")]
         [Summary("Remove a specific character's data.")]
-        public async Task DeleteCharacterByName(string name)
+        public async Task DeleteCharacterByName(string characterName)
         {
-            await _dynamoService.DeleteCharacterRecord(name);
+            await _dynamoService.DeleteCharacterRecord(characterName);
 
             await Context.Message.Channel.SendMessageAsync("Done!  If that character existed... they don't anymore!");
             

@@ -29,6 +29,8 @@ namespace DnDDiscordBot
             _client.MessageReceived += HandleCommandAsync;
             _client.MessageReceived += HandleMessageAsync;
 
+            _commands.CommandExecuted += OnCommandExecutedAsync;
+
             // Here we discover all of the command modules in the entry 
             // assembly and load them. Starting from Discord.NET 2.0, a
             // service provider is required to be passed into the
@@ -102,13 +104,15 @@ namespace DnDDiscordBot
             });
         }
 
-
-        public async Task ReactWithEmoteAsync(SocketUserMessage userMsg, string escapedEmote)
+        public async Task OnCommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
         {
-            if (Emote.TryParse(escapedEmote, out var emote))
+
+            if (!string.IsNullOrEmpty(result?.ErrorReason))
             {
-                await userMsg.AddReactionAsync(emote);
+                await context.Channel.SendMessageAsync(result.ErrorReason);
             }
+
+
         }
     }
 }

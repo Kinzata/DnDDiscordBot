@@ -1,20 +1,57 @@
-﻿using Discord.Commands;
+﻿using Discord;
+using Discord.Commands;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Modules
 {
     [Group("timbly")]
+    [Alias("tim", "registry")]
     public class CommandsModule : ModuleBase<SocketCommandContext>
     {
-        [Command("help")]
-        [Summary("")]
-        public Task PingAsync()
+        private CommandService _commandService;
+
+        public CommandsModule(CommandService commandService)
         {
-            var channel = Context.Channel;
+            _commandService = commandService;
+        }
 
-            channel.SendMessageAsync("Pong!");
+        [Command("help")]
+        [Summary("This command.")]
+        public async Task HelpAsync()
+        {
+            List<CommandInfo> commands = _commandService.Commands.ToList();
+            EmbedBuilder embedBuilder = new EmbedBuilder();
 
-            return Task.CompletedTask;
+            try
+            {
+                foreach (CommandInfo command in commands)
+                {
+                    var arguments = command.Parameters;
+                    var argumentEmbedText = "";
+                    if( arguments.Count > 0)
+                    {
+                        argumentEmbedText = $" [{arguments[0].Name}]";
+                    }
+
+                    // Get the command Summary attribute information
+                    string embedFieldText = command.Summary;
+                    if( string.IsNullOrEmpty(embedFieldText))
+                    {
+                        embedFieldText = "No description available\n";
+                    }
+
+                    embedBuilder.AddField(command.Name + argumentEmbedText, embedFieldText);
+                }
+            }
+            catch( Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            await ReplyAsync("Here's a list of commands and their description: ", false, embedBuilder.Build());
         }
 
     }
