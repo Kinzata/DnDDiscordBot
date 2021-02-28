@@ -11,7 +11,6 @@ namespace DnDDiscordBot.Services
     public class DynamoService
     {
         private string _characterDataTablename = "";
-
         private AmazonDynamoDBClient _dbClient;
 
         public DynamoService(AmazonDynamoDBClient dbClient)
@@ -59,12 +58,13 @@ namespace DnDDiscordBot.Services
 
             try
             {
-                //var response = await _dbClient.DescribeTableAsync(CHARACTER_DATA_TABLENAME);
-                var response = await _dbClient.ScanAsync(_characterDataTablename, new List<string> { "CharacterName", "Level", "UserId" });
+                var query = new ScanRequest(_characterDataTablename);
+                var response = await _dbClient.ScanAsync(query);
 
                 result = response.Items.Select(item => item).Select(attributes => {
                     return new LevelLog
                     {
+                        Guid = attributes["Guid"].S,
                         CharacterName = attributes["CharacterName"].S,
                         Level = int.Parse(attributes["Level"].S),
                         UserId = ulong.Parse(attributes["UserId"].S)
@@ -85,7 +85,6 @@ namespace DnDDiscordBot.Services
 
             try
             {
-
                 var query = new ScanRequest(_characterDataTablename);
                 query.FilterExpression = $"SearchFieldCharacterName = :key";
                 query.ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
@@ -99,6 +98,7 @@ namespace DnDDiscordBot.Services
                 {
                     log = new LevelLog
                     {
+                        Guid = result["Guid"].S,
                         CharacterName = result["CharacterName"].S,
                         Level = int.Parse(result["Level"].S),
                         UserId = ulong.Parse(result["UserId"].S)
@@ -117,7 +117,6 @@ namespace DnDDiscordBot.Services
 
             try
             {
-
                 var query = new ScanRequest(_characterDataTablename);
                 query.FilterExpression = $"UserId = :key";
                 query.ExpressionAttributeValues = new Dictionary<string, AttributeValue> {
@@ -133,6 +132,7 @@ namespace DnDDiscordBot.Services
                     {
                         logs.Add(new LevelLog
                         {
+                            Guid = item["Guid"].S,
                             CharacterName = item["CharacterName"].S,
                             Level = int.Parse(item["Level"].S),
                             UserId = ulong.Parse(item["UserId"].S)
@@ -147,8 +147,9 @@ namespace DnDDiscordBot.Services
             return logs.ToArray();
         }
 
-        public async void InsertCharacterList(List<LevelLog> logs)
+        public async Task InsertCharacterListAsync(List<LevelLog> logs)
         {
+            Console.WriteLine("InsertCharacterListAsync called...");
             try
             {
                 var request = new TransactWriteItemsRequest();
@@ -156,7 +157,7 @@ namespace DnDDiscordBot.Services
                 var transactItems = new List<TransactWriteItem>();
                 TransactWriteItemsResponse response;
 
-                foreach( var log in logs)
+                foreach( var log in logs )
                 {
                     transactItems.Add(
                         new TransactWriteItem
@@ -184,13 +185,66 @@ namespace DnDDiscordBot.Services
             { }
         }
 
-        public async Task DeleteCharacterRecord(string name)
+        public async Task InsertCharacterAsync(LevelLog log)
         {
+            Console.WriteLine("InsertCharacterAsync called...");
+            try
+            {
+                var request = new TransactWriteItemsRequest();
 
+                request.TransactItems = new List<TransactWriteItem>
+                {
+                    new TransactWriteItem
+                    {
+                        Put = new Put { TableName = _characterDataTablename, Item = log.ToTransactItemDictionary() }
+                    } 
+                };
+
+                await _dbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception ex)
+            { }
+        }
+
+        public async Task UpdateCharacterAsync(LevelLog log)
+        {
+            Console.WriteLine("UpdateCharacterAsync called...");
+            try
+            {
+                var request = new TransactWriteItemsRequest();
+
+                var updateExpression = $"SET #l = :l";
+                var names = new Dictionary<string, string> { { "#l", "Level" } };
+                var key = new Dictionary<string, AttributeValue> { { "Guid", new AttributeValue { S = log.Guid } } };
+                var expression = new Dictionary<string, AttributeValue> { { ":l", new AttributeValue { S = log.Level.ToString() } } };
+
+                request.TransactItems = new List<TransactWriteItem>
+                {
+                    new TransactWriteItem
+                    {
+                        Update = new Update { 
+                            TableName = _characterDataTablename,
+                            UpdateExpression = updateExpression,
+                            Key = key,
+                            ExpressionAttributeValues = expression,
+                            ExpressionAttributeNames = names
+                        }
+       
+                    }
+                };
+
+                var response = await _dbClient.TransactWriteItemsAsync(request);
+            }
+            catch (Exception ex)
+            { }
+        }
+
+        public async Task DeleteCharacterRecord(string key)
+        {
             try
             {
                 var deleteQuery = new DeleteItemRequest(_characterDataTablename, new Dictionary<string, AttributeValue> {
-                    {"CharacterName", new AttributeValue { S = name }}});
+                    {"Guid", new AttributeValue { S = key }}});
 
                 await _dbClient.DeleteItemAsync(deleteQuery);
             }

@@ -5,7 +5,6 @@ using DnDDiscordBot.PreConditions;
 using DnDDiscordBot.Services;
 using System;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Modules
@@ -15,71 +14,63 @@ namespace DnDDiscordBot.Modules
     public class LevelLogModule : ModuleBase<SocketCommandContext>
     {
         private readonly LevelLogService _levelLogService;
-        private readonly DynamoService _dynamoService;
 
         private const string LEVEL_LOG_CHANNEL = "level-up-log";
 
-        public LevelLogModule(LevelLogService levelLogService, DynamoService dynamoService)
+        public LevelLogModule(LevelLogService levelLogService)
         {
             _levelLogService = levelLogService;
-            _dynamoService = dynamoService;
         }
 
-        [Command("recordLevelLog")]
-        [RequireRole("Moderator")]
-        [Summary("Read level log messages and write parsed data to a local file.")]
-        public Task ReadLogAsync()
-        {
-            var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, 300);
-            
-            if( messages == null) {
-                return Task.CompletedTask;
-            }
+        //[Command("updateCache")]
+        //[RequireRole("Moderator")]
+        //[Summary("Force local cache to update from DB.")]
+        //public async Task ForceUpdateCache()
+        //{
+        //    var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, 1);
 
-            foreach( var message in messages)
-            {
-                _levelLogService.HandleMessage(message);
-            }
+        //    if (messages == null)
+        //    {
+        //        return;
+        //    }
 
-            _levelLogService.ExportCharacterLevels();
+        //    foreach (var message in messages)
+        //    {
+        //        await _levelLogService.HandleMessage(message, false);
+        //    }
 
-            return Task.CompletedTask;
-        }
+        //    await _levelLogService.SaveCharacterListAsync();
+        //}
 
         [Command("recordLevelLogDb")]
         [RequireRole("Moderator")]
         [Summary("Read level log messages and write parsed data to the database.")]
-        public Task ReadLogAsyncDb()
+        public async Task ReadLogAsyncDb(int numberOfLogsToRead)
         {
-            var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, 300);
+            var messages = DiscordContextHelpers.RetrieveMessagesFromChannel(Context, LEVEL_LOG_CHANNEL, numberOfLogsToRead);
 
             if (messages == null)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             foreach (var message in messages)
             {
-                _levelLogService.HandleMessage(message);
+                await _levelLogService.HandleMessage(message, false);
             }
 
-            _dynamoService.InsertCharacterList(_levelLogService.GetSortedLevelLogs());
-
-            // Export the DB list so that next time on boot we restore the same cache without needing to pull data
-            _levelLogService.ExportCharacterLevels();
-
-            return Task.CompletedTask;
+            await _levelLogService.SaveCharacterListAsync();
         }
 
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
         [RequireRole("DM")]
         [Summary("Retrieve all character data and display as an embed.")]
-        public async Task ServerCharactersDb()
+        public async Task GetAllFormattedCharacterData()
         {
             var channel = Context.Channel;
 
-            var result = await _dynamoService.GetAllCharacterData();
+            var result = _levelLogService.RetrieveAllCharacterData();
 
             if( result != null && result.Count() > 0)
             {
@@ -141,11 +132,11 @@ namespace DnDDiscordBot.Modules
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
         [Summary("Retrieve a specific character's data and display as an embed")]
-        public Task GetCharacterByName(string characterName)
+        public async Task GetCharacterByName(string characterName)
         {
             var channel = Context.Channel;
 
-            var result = _dynamoService.GetCharacterData(characterName).Result;
+            var result = _levelLogService.GetCharacterData(characterName);
 
             if( result != null)
             {
@@ -159,24 +150,22 @@ namespace DnDDiscordBot.Modules
                 embed.AddField("Level", result.Level);
                 embed.AddField("UserId", Context.Client.GetUser(result.UserId).Username);
 
-                channel.SendMessageAsync("", embed: embed.Build());
+                await channel.SendMessageAsync("", embed: embed.Build());
             }
             else
             {
-                channel.SendMessageAsync($"No character named \"{characterName}\" found.");
+                await channel.SendMessageAsync($"No character named \"{characterName}\" found.");
             }
-
-            return Task.CompletedTask;
         }
 
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
         [Summary("Retrieve a specific user's character data and display as an embed.")]
-        public Task GetCharacterByUser(IUser user)
+        public async Task GetCharacterByUser(IUser user)
         {
             var channel = Context.Channel;
 
-            var result = _dynamoService.GetCharacterData(user.Id).Result;
+            var result = _levelLogService.GetCharacterData(user.Id);
 
             if (result != null && result.Length != 0)
             {
@@ -191,14 +180,12 @@ namespace DnDDiscordBot.Modules
                     embed.AddField(character.CharacterName, $"Level: {character.Level}");
                 }
 
-                channel.SendMessageAsync("", embed: embed.Build());
+                await channel.SendMessageAsync("", embed: embed.Build());
             }
             else
             {
-                channel.SendMessageAsync($"No characters found for \"{user.Username}\".");
+                await channel.SendMessageAsync($"No characters found for \"{user.Username}\".");
             }
-
-            return Task.CompletedTask;
         }
 
         [Command("delete")]
@@ -206,7 +193,7 @@ namespace DnDDiscordBot.Modules
         [Summary("Remove a specific character's data.")]
         public async Task DeleteCharacterByName(string characterName)
         {
-            await _dynamoService.DeleteCharacterRecord(characterName);
+            await _levelLogService.DeleteCharacterDataAsync(characterName);
 
             await Context.Message.Channel.SendMessageAsync("Done!  If that character existed... they don't anymore!");
             

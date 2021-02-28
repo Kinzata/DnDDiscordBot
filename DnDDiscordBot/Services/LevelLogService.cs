@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Services
 {
@@ -13,10 +14,12 @@ namespace DnDDiscordBot.Services
     {
         private const string CHARACTER_DATA_STATIC_FILENAME = "DnDServerCharacterLevels.json";
 
-        private Dictionary<ulong, LevelLog> _characterLevels;
+        private Dictionary<string, LevelLog> _characterLevels;
+        private readonly DynamoService _dynamoService;
 
-        public LevelLogService()
+        public LevelLogService(DynamoService dynamoService)
         {
+            _dynamoService = dynamoService;
             _characterLevels = InitializeCharacterLog();
         }
 
@@ -25,62 +28,133 @@ namespace DnDDiscordBot.Services
             return _characterLevels.OrderByDescending(record => record.Value.Level).Select(record => record.Value).ToList();
         }
 
-        public bool HandleMessage(IMessage message)
+        public async Task<bool> HandleMessage(IMessage message, bool shouldSaveToDB = false)
         {
             var isParsed = false;
 
-            var messageId = message.Id;
-            if (_characterLevels.ContainsKey(messageId))
+            var levelLog = ParseDiscordMessage(message);
+            if (levelLog.IsValid())
             {
-                Console.WriteLine($"Duplicate message read, skipping -- {messageId}");
-            }
-            else
-            {
-                var levelLog = ParseDiscordMessage(message);
-                if (levelLog.IsValid())
+                Console.WriteLine(levelLog.ToStringSafe());
+                isParsed = true;
+
+                var updated = TryUpdateExistingRecord(levelLog, out var existingRecord);
+
+                if( existingRecord == null )
                 {
-                    InsertLevelLogIfNotDuplicate(messageId, levelLog);
-                    Console.WriteLine(levelLog.ToStringSafe());
-                    isParsed = true;
+                    _characterLevels.Add(levelLog.Guid, levelLog);
+                    if (shouldSaveToDB)
+                    {
+                        await _dynamoService.InsertCharacterAsync(levelLog);
+                    }
                 }
+                else
+                {
+                    // We have an existing record, update the one in the DB
+                    if (shouldSaveToDB && updated)
+                    {
+                        await _dynamoService.UpdateCharacterAsync(existingRecord);
+                    }
+                }
+
+                UpdateLocalCache();
             }
 
             return isParsed;
         }
 
-        private void InsertLevelLogIfNotDuplicate(ulong messageId, LevelLog log)
+        /// <summary>
+        /// Stores the LevelLog only if it is a new character, or updates the existing record if one already exists but is a lower level
+        /// </summary>
+        /// <param name="log"></param>
+        /// <returns>True/False - Whether the existing record was updated</returns>
+        private bool TryUpdateExistingRecord(LevelLog log, out LevelLog existingRecord)
         {
-            var existingRecord = _characterLevels.Where(record => record.Value.CharacterName == log.CharacterName).Select(record => record.Value).FirstOrDefault();
+            existingRecord = _characterLevels.Where(record => record.Value.CharacterName == log.CharacterName).Select(record => record.Value).FirstOrDefault();
             if (existingRecord != null)
             {
                 // Check if level is higher
-                if (existingRecord.Level <= log.Level)
+                if (existingRecord.Level < log.Level)
                 {
-                    _characterLevels.Remove(existingRecord.MessageId);
-                    _characterLevels.Add(log.MessageId, log);
+                    existingRecord.UpdateFrom(log);
+                    return true;
                 }
             }
-            else
-            {
-                _characterLevels.Add(messageId, log);
-            }
+            return false;
         }
 
-        private Dictionary<ulong, LevelLog> InitializeCharacterLog()
+        private Dictionary<string, LevelLog> InitializeCharacterLog()
         {
             if (File.Exists(CHARACTER_DATA_STATIC_FILENAME))
             {
                 var json = File.ReadAllText(CHARACTER_DATA_STATIC_FILENAME);
 
-                return JsonConvert.DeserializeObject<Dictionary<ulong, LevelLog>>(json);
+                return JsonConvert.DeserializeObject<Dictionary<string, LevelLog>>(json);
             }
             else
             {
-                return new Dictionary<ulong, LevelLog>();
+                return new Dictionary<string, LevelLog>();
             }
         }
 
-        public void ExportCharacterLevels()
+        public LevelLog GetCharacterData(string characterName)
+        {
+            var character = _characterLevels.Select(row => row.Value).Where(log => log.SearchFieldCharacterName == characterName.ToLower()).FirstOrDefault();
+            
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+            
+            return character;
+        }
+
+        public LevelLog[] GetCharacterData(ulong userId)
+        {
+            var characters = _characterLevels.Select(row => row.Value).Where(log => log.UserId == userId).ToArray();
+
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+
+            return characters;
+        }
+
+        public List<LevelLog> RetrieveAllCharacterData()
+        {
+            // For now, we store this in memory with a database and local cache backup.
+            // The data in memory is expected to be correct, so just return that
+
+            return GetSortedLevelLogs();
+        }
+
+        public async Task DeleteCharacterDataAsync(string characterName)
+        {
+            var key = _characterLevels.Where(row => row.Value.SearchFieldCharacterName == characterName.ToLower()).Select(row => row.Key).FirstOrDefault();
+            
+            if( !string.IsNullOrEmpty(key) )
+            {
+                _characterLevels.Remove(key);
+                UpdateLocalCache();
+                await _dynamoService.DeleteCharacterRecord(key);
+            }
+        }
+
+        public async Task UpdateCacheFromDBAsync()
+        {
+            //var data = _dynamoService.GetAllCharacterData();
+
+        }
+
+        /// <summary>
+        /// Save character list to both DB and cache
+        /// </summary>
+        public async Task SaveCharacterListAsync()
+        {
+            UpdateLocalCache();
+            await _dynamoService.InsertCharacterListAsync(GetSortedLevelLogs());
+        }
+
+        /// <summary>
+        /// Updates local cache of character data only
+        /// </summary>
+        /// <param name="logs"></param>
+        private void UpdateLocalCache()
         {
             var jsonString = JsonConvert.SerializeObject(_characterLevels);
 
@@ -91,7 +165,7 @@ namespace DnDDiscordBot.Services
         {
             var levelLog = new LevelLog();
 
-            levelLog.MessageId = message.Id;
+            levelLog.Guid = Guid.NewGuid().ToString();
             levelLog.UserId = ParseOwnerIdFromContent(message.Content);
             levelLog.CharacterName = ParseCharacterNameFromContent(message.Content);
             levelLog.Level = ParseLevelFromContent(message.Content);

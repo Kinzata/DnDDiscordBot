@@ -88,10 +88,9 @@ namespace DnDDiscordBot
 
             var levelLogService = (LevelLogService) _services.GetService(typeof(LevelLogService));
 
-
             await Task.Run(async () =>
             {
-                var wasParsed = levelLogService.HandleMessage(message);
+                var wasParsed = await levelLogService.HandleMessage(message, true);
 
                 if (!wasParsed)
                 {
@@ -106,13 +105,10 @@ namespace DnDDiscordBot
 
         public async Task OnCommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
         {
-
-            if (!string.IsNullOrEmpty(result?.ErrorReason))
+            if (!string.IsNullOrEmpty(result?.ErrorReason) && result.ErrorReason != "Unknown command.")
             {
                 await context.Channel.SendMessageAsync(result.ErrorReason);
             }
-
-
         }
     }
 }
