@@ -1,9 +1,12 @@
 ﻿using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
 using DnDDiscordBot.Helpers;
+using DnDDiscordBot.Models;
 using DnDDiscordBot.PreConditions;
 using DnDDiscordBot.Services;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -64,15 +67,47 @@ namespace DnDDiscordBot.Modules
 
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
-        [RequireRole("DM")]
-        [Summary("Retrieve all character data and display as an embed.")]
-        public async Task GetAllFormattedCharacterData()
+        [Summary("Retrieve character data.\n" +
+            "__Valid Arguments__\n" +
+            "`Name: <character name>` - Character name to search for specifically\n" +
+            "`Levels: <low,high>` - Low and high level bounds, separated by a comma")]
+        public async Task GetCharacterData(LevelLogCharacterNamedArguments args = null)
+        {
+            // Set up roles for future use
+            IReadOnlyCollection<SocketRole> roles;
+
+            if (Context.User is SocketGuildUser gUser)
+            {
+                roles = gUser.Roles;
+            }
+
+            if ( !string.IsNullOrWhiteSpace(args?.Name))
+            {
+                await GetCharacterByName(args?.Name);
+                return;
+            }
+            else if (args?.Levels != null)
+            {
+                var logs = _levelLogService.RetrieveAllCharacterData().Where(log => 
+                       log.Level >= args.Low
+                    && log.Level <= args.High)
+                    .ToList();
+                await GetFormattedCharacterData(logs);
+            }
+            else
+            {
+                var logs = _levelLogService.RetrieveAllCharacterData();
+                await GetFormattedCharacterData(logs);
+            }
+
+
+        }
+
+        private async Task GetFormattedCharacterData(List<LevelLog> logs)
         {
             var channel = Context.Channel;
 
-            var result = _levelLogService.RetrieveAllCharacterData();
-
-            if( result != null && result.Count() > 0)
+            if(logs != null && logs.Count() > 0)
             {
                 var page = 1;
                 var embed = new EmbedBuilder
@@ -83,7 +118,7 @@ namespace DnDDiscordBot.Modules
                 };
 
                 var fieldCount = 0;
-                var groups = result.GroupBy(row => row.UserId).ToList();
+                var groups = logs.GroupBy(row => row.UserId).ToList();
                 try
                 {
                     foreach (var group in groups)
@@ -129,10 +164,7 @@ namespace DnDDiscordBot.Modules
 
         }
 
-        [Command("characters")]
-        [Alias("c", "char", "chars", "character")]
-        [Summary("Retrieve a specific character's data and display as an embed")]
-        public async Task GetCharacterByName(string characterName)
+        private async Task GetCharacterByName(string characterName)
         {
             var channel = Context.Channel;
 
@@ -161,7 +193,7 @@ namespace DnDDiscordBot.Modules
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
         [Summary("Retrieve a specific user's character data and display as an embed.")]
-        public async Task GetCharacterByUser(IUser user)
+        public async Task GetCharacterByUser(IUser user, LevelLogCharacterNamedArguments args = null)
         {
             var channel = Context.Channel;
 

@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.Commands;
+using DnDDiscordBot.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,7 +34,16 @@ namespace DnDDiscordBot.Modules
                     var argumentEmbedText = "";
                     if( arguments.Count > 0)
                     {
-                        argumentEmbedText = $" [{arguments[0].Name}]";
+                        var name = arguments[0].Name;
+                        if (name == "args")
+                        {
+                            name = "args...";
+                            argumentEmbedText = $" [{name}]";
+                        }
+                        else
+                        {
+                            argumentEmbedText = $" <{name}>";
+                        }
                     }
 
                     // Get the command Summary attribute information
