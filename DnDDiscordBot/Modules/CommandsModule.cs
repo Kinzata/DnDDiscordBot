@@ -1,6 +1,5 @@
 ﻿using Discord;
 using Discord.Commands;
-using DnDDiscordBot.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;

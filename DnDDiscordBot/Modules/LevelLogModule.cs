@@ -69,8 +69,9 @@ namespace DnDDiscordBot.Modules
         [Alias("c", "char", "chars", "character")]
         [Summary("Retrieve character data.\n" +
             "__Valid Arguments__\n" +
-            "`Name: <character name>` - Character name to search for specifically\n" +
-            "`Levels: <low,high>` - Low and high level bounds, separated by a comma")]
+            "`name: <character name>` - Character name to search for specifically\n" +
+            "`levels: <low-high>` - Low and high level bounds, separated by a dash\n" +
+            "`details: <true/false>` - Character data will be more detailed and individual\n")]
         public async Task GetCharacterData(LevelLogCharacterNamedArguments args = null)
         {
             // Set up roles for future use
@@ -81,29 +82,41 @@ namespace DnDDiscordBot.Modules
                 roles = gUser.Roles;
             }
 
-            if ( !string.IsNullOrWhiteSpace(args?.Name))
+            if ( !string.IsNullOrWhiteSpace(args?.name))
             {
-                await GetCharacterByName(args?.Name);
+                await GetCharacterByName(args?.name);
                 return;
             }
-            else if (args?.Levels != null)
+            else if (args?.levels != null)
             {
                 var logs = _levelLogService.RetrieveAllCharacterData().Where(log => 
-                       log.Level >= args.Low
-                    && log.Level <= args.High)
+                       log.Level >= args.low
+                    && log.Level <= args.high)
                     .ToList();
-                await GetFormattedCharacterData(logs);
+                await SendCharacterDataToChannel(logs, args?.details);
             }
             else
             {
                 var logs = _levelLogService.RetrieveAllCharacterData();
-                await GetFormattedCharacterData(logs);
+                await SendCharacterDataToChannel(logs, args?.details);
             }
 
 
         }
 
-        private async Task GetFormattedCharacterData(List<LevelLog> logs)
+        private async Task SendCharacterDataToChannel(List<LevelLog> logs, bool? detailedData = false)
+        {
+            if( detailedData.HasValue && detailedData.Value )
+            {
+                await SendFormattedDetailedCharacterDataToChannel(logs);
+            }
+            else
+            {
+                await SendSummarizedCharacterDataToChannel(logs);
+            }
+        }
+
+        private async Task SendFormattedDetailedCharacterDataToChannel(List<LevelLog> logs)
         {
             var channel = Context.Channel;
 
@@ -159,9 +172,45 @@ namespace DnDDiscordBot.Modules
             }
             else
             {
-                await channel.SendMessageAsync("There was an issue retrieving character data...");
+                await channel.SendMessageAsync("No characters with the specified conditions were found.");
             }
+        }
 
+        private async Task SendSummarizedCharacterDataToChannel(List<LevelLog> logs)
+        {
+            var channel = Context.Channel;
+
+            if (logs != null && logs.Count() > 0)
+            {
+                var embed = new EmbedBuilder
+                {
+                    Title = $"Timbly's Character Records: Summary",
+                    Footer = new EmbedFooterBuilder { Text = "Recorded by Timbly" },
+                    Timestamp = DateTime.Now
+                };
+
+
+                var levelGroups = logs.GroupBy(row => row.Level).OrderBy(group => group.Key).ToList();
+                try
+                {
+                    var characterData = "";
+                    foreach (var levelGroup in levelGroups)
+                    {
+                        characterData += $"Level {levelGroup.Key}: {levelGroup.Count()}\n";
+                    }
+                    embed.AddField("Character Count By Level:", characterData);
+                }
+                catch (Exception ex)
+                {
+                    await channel.SendMessageAsync("There was an issue retrieving character data...:" + ex.Message);
+                }
+
+                await channel.SendMessageAsync(embed: embed.Build());
+            }
+            else
+            {
+                await channel.SendMessageAsync("No characters with the specified conditions were found.");
+            }
         }
 
         private async Task GetCharacterByName(string characterName)
