@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using DnDDiscordBot.MessageHandlers.MessageReceived;
 using DnDDiscordBot.Services;
 using System;
 using System.Reflection;
@@ -78,29 +79,16 @@ namespace DnDDiscordBot
             // Create a number to track where the prefix ends and the command begins
             int argPos = 0;
 
-            if (message.Channel.Name != LEVEL_LOG_CHANNEL) return;
-
             // Determine if the message is not a command based on the prefix and make sure no bots trigger this
             if ((message.HasCharPrefix('!', ref argPos) ||
                 message.HasMentionPrefix(_client.CurrentUser, ref argPos)) ||
                 message.Author.IsBot)
                 return;
 
-            var levelLogService = (LevelLogService) _services.GetService(typeof(LevelLogService));
-
-            await Task.Run(async () =>
+            if( message.Channel.Name == LEVEL_LOG_CHANNEL )
             {
-                var wasParsed = await levelLogService.HandleMessage(message, true);
-
-                if (!wasParsed)
-                {
-                    await message.AddReactionAsync(new Emoji("❌"));
-                }
-                else
-                {
-                    await message.AddReactionAsync(new Emoji("✅"));
-                }
-            });
+                await new LevelLogMessageHandler().ExecuteAsync(message, _services);
+            }
         }
 
         public async Task OnCommandExecutedAsync(Optional<CommandInfo> command, ICommandContext context, IResult result)
