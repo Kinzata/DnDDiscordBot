@@ -29,6 +29,7 @@ namespace DnDDiscordBot
             // Hook the MessageReceived event into our command handler
             _client.MessageReceived += HandleCommandAsync;
             _client.MessageReceived += HandleMessageAsync;
+            _client.MessageUpdated += HandleMessageUpdatedAsync;
 
             _commands.CommandExecuted += OnCommandExecutedAsync;
 
@@ -88,6 +89,28 @@ namespace DnDDiscordBot
             if( message.Channel.Name == LEVEL_LOG_CHANNEL )
             {
                 await new LevelLogMessageHandler().ExecuteAsync(message, _services);
+            }
+        }
+
+        private async Task HandleMessageUpdatedAsync(Cacheable<IMessage, ulong> cache, SocketMessage newMessageParam, ISocketMessageChannel channel)
+        {
+            // Don't process the command if it was a system message
+            var newMessage = newMessageParam as SocketUserMessage;
+            if (newMessage == null) return;
+
+            // Create a number to track where the prefix ends and the command begins
+            int argPos = 0;
+
+            // Determine if the message is not a command based on the prefix and make sure no bots trigger this
+            if ((newMessage.HasCharPrefix('!', ref argPos) ||
+                newMessage.HasMentionPrefix(_client.CurrentUser, ref argPos)) ||
+                newMessage.Author.IsBot)
+                return;
+
+            if (newMessage.Channel.Name == LEVEL_LOG_CHANNEL)
+            {
+                await newMessage.RemoveAllReactionsAsync();
+                await new LevelLogMessageHandler().ExecuteAsync(newMessage, _services);
             }
         }
 
