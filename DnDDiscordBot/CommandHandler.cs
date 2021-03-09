@@ -86,10 +86,19 @@ namespace DnDDiscordBot
                 message.Author.IsBot)
                 return;
 
-            if( message.Channel.Name == LEVEL_LOG_CHANNEL )
+            var dmChannel = message.Channel as SocketDMChannel;
+            if( dmChannel != null)
             {
-                await new LevelLogMessageHandler().ExecuteAsync(message, _services);
+                await new DirectMessageHandler().ExecuteAsync(message, dmChannel, _services);
             }
+            else
+            {
+                if( message.Channel.Name == LEVEL_LOG_CHANNEL )
+                {
+                    await new LevelLogMessageHandler().ExecuteAsync(message, _services);
+                }
+            }
+
         }
 
         private async Task HandleMessageUpdatedAsync(Cacheable<IMessage, ulong> cache, SocketMessage newMessageParam, ISocketMessageChannel channel)
