@@ -30,7 +30,9 @@ namespace DnDDiscordBot
 
 			.AddSingleton<DynamoService>()
 			.AddSingleton<LevelLogService>()
+			.AddSingleton<UserCommandStateService>()
 			.AddSingleton<CommandHandler>()
+			.AddSingleton<QuestService>()
 			.BuildServiceProvider();
 	}
 }
