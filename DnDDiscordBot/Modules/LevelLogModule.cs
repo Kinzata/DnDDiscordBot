@@ -67,7 +67,8 @@ namespace DnDDiscordBot.Modules
 
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
-        [Summary("Retrieve character data.\n" +
+        [Summary("Alias: c, char, chars, character\n" +
+            "Retrieve character data.\n" +
             "__Valid Arguments__\n" +
             "`name: <character name>` - Character name to search for specifically\n" +
             "`levels: <low-high>` - Low and high level bounds, separated by a dash\n" +
@@ -241,7 +242,8 @@ namespace DnDDiscordBot.Modules
 
         [Command("characters")]
         [Alias("c", "char", "chars", "character")]
-        [Summary("Retrieve a specific user's character data and display as an embed.")]
+        [Summary("Alias: c, char, chars, character\n" +
+            "Retrieve a specific user's character data and display as an embed.")]
         public async Task GetCharacterByUser(IUser user, LevelLogCharacterNamedArguments args = null)
         {
             var channel = Context.Channel;
