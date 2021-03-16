@@ -31,9 +31,9 @@ namespace DnDDiscordBot
 			var serviceProvider = new Initialize(commands, _client, dbClient).BuildServiceProvider();
 
 			var handler = new CommandHandler(serviceProvider, _client, commands);
-			await handler.InstallCommandsAsync();
+            await handler.InstallCommandsAsync();
 
-			var token = Environment.GetEnvironmentVariable("DISCORD_DND_BOT_TOKEN");
+            var token = Environment.GetEnvironmentVariable("DISCORD_DND_BOT_TOKEN");
 
 			await _client.LoginAsync(TokenType.Bot, token);
 			await _client.StartAsync();

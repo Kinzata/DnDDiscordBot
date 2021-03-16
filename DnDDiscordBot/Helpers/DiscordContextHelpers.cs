@@ -22,5 +22,16 @@ namespace DnDDiscordBot.Helpers
 
             return flattened;
         }
+
+        public static bool UserHasRole(IUser user, string roleName)
+        {
+            if (user is SocketGuildUser gUser)
+            {
+                if (gUser.Roles.Any(r => r.Name == roleName))
+                    return true;
+            }
+
+            return false;
+        }
     }
 }
