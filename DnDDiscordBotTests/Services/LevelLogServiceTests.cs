@@ -12,7 +12,7 @@ namespace DnDDiscordBotTests
 
         public void ParseOwnerIdFromContent(string content, ulong expectedTestResult)
         {
-            var service = new LevelLogService();
+            var service = new LevelLogService(null);
 
             Assert.Equal(expectedTestResult, service.ParseOwnerIdFromContent(content));
         }
@@ -27,7 +27,7 @@ namespace DnDDiscordBotTests
         [InlineData("<@!95703816439083008>  as Yuki gains 0 xp to advance to level 7\nAdvancing to a total level of: 7 in Keeper's Pet\nRolling HP: 5\nNew HP: 45 + 5 + 2 = 52\nNew/improvement class feature: Nothing", "Yuki")]
         public void ParseCharacterNameFromContent(string content, string expectedTestResult)
         {
-            var service = new LevelLogService();
+            var service = new LevelLogService(null);
 
             Assert.Equal(expectedTestResult, service.ParseCharacterNameFromContent(content));
         }
@@ -39,7 +39,7 @@ namespace DnDDiscordBotTests
         [InlineData("<@asdfsd> as Shrizyne Quavarn, pitfought her way straight to Level 20", 20)]
         public void ParseLevelFromContent(string content, int expectedTestResult)
         {
-            var service = new LevelLogService();
+            var service = new LevelLogService(null);
 
             Assert.Equal(expectedTestResult, service.ParseLevelFromContent(content));
         }

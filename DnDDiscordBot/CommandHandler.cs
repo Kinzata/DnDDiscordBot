@@ -1,6 +1,7 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using DnDDiscordBot.Commands;
 using DnDDiscordBot.MessageHandlers.MessageReceived;
 using DnDDiscordBot.Services;
 using System;
@@ -22,6 +23,12 @@ namespace DnDDiscordBot
             _client = client;
             _commands = commands;
             _services = services;
+
+            //_client.MessageReceived += HandleCommandAsync;
+            //_client.MessageReceived += HandleMessageAsync;
+            //_client.MessageUpdated += HandleMessageUpdatedAsync;
+
+            //_commands.CommandExecuted += OnCommandExecutedAsync;
         }
 
         public async Task InstallCommandsAsync()
@@ -33,14 +40,7 @@ namespace DnDDiscordBot
 
             _commands.CommandExecuted += OnCommandExecutedAsync;
 
-            // Here we discover all of the command modules in the entry 
-            // assembly and load them. Starting from Discord.NET 2.0, a
-            // service provider is required to be passed into the
-            // module registration method to inject the 
-            // required dependencies.
-            //
-            // If you do not use Dependency Injection, pass null.
-            // See Dependency Injection guide for more information.
+
             await _commands.AddModulesAsync(assembly: Assembly.GetEntryAssembly(),
                                             services: _services);
         }
@@ -62,6 +62,7 @@ namespace DnDDiscordBot
 
             // Create a WebSocket-based command context based on the message
             var context = new SocketCommandContext(_client, message);
+
 
             // Execute the command with the command context we just
             // created, along with the service provider for precondition checks.
