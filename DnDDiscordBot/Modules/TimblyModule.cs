@@ -4,6 +4,7 @@ using DnDDiscordBot.Commands;
 using DnDDiscordBot.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Modules
@@ -23,7 +24,7 @@ namespace DnDDiscordBot.Modules
         public async Task Execute([Remainder] string input)
         {
             var content = Context.Message.Content;
-            var args = content.Split(' ');
+            var args = content.SplitArgs();
             var list = new List<string>(args);
             list.RemoveAt(0); // Remove command that got us here
 
