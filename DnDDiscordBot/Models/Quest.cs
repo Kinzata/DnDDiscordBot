@@ -14,6 +14,7 @@ namespace DnDDiscordBot.Models
         public int PlayerCountLow { get; set; }
         public int PlayerCountHigh { get; set; }
         public string QuestType { get; set; }
+        public string Description { get; set; }
         public List<string> CharactersRegistered { get; set; }
     }
 }

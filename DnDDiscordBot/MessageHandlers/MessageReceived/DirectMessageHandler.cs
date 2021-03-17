@@ -3,6 +3,7 @@ using DnDDiscordBot.Models;
 using DnDDiscordBot.Services;
 using System;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace DnDDiscordBot.MessageHandlers.MessageReceived
 {
@@ -16,8 +17,16 @@ namespace DnDDiscordBot.MessageHandlers.MessageReceived
             var user = message.Author;
 
             var state = userCommandStateService.GetCommandStateForUser(user);
-      
-            if( state == CommandState.QuestCreation)
+
+            var keyCommand = Keywords.Where(w => message.Content == w).Select(w => w).FirstOrDefault();
+
+            if( !string.IsNullOrWhiteSpace(keyCommand))
+            {
+                await HandleKeywords(keyCommand, message, channel, services);
+                return;
+            }
+
+            if ( state == CommandState.QuestCreation)
             {
                 var success = await questService.TryRegisterQuest(message);
                 if( success )
@@ -30,6 +39,24 @@ namespace DnDDiscordBot.MessageHandlers.MessageReceived
             {
                 await channel.SendMessageAsync($"Your current state is: {state}");
             }
+        }
+
+        private static string[] Keywords = { "cancel" };
+
+        private async Task HandleKeywords(string keyword, SocketUserMessage message, SocketDMChannel channel, IServiceProvider services){
+            switch (keyword)
+            {
+                case "cancel":
+                    await HandleCancelAsync(message, channel, services);
+                    break;
+            }
+        }
+
+        private async Task HandleCancelAsync(SocketUserMessage message, SocketDMChannel channel, IServiceProvider services)
+        {
+            var userCommandStateService = (UserCommandStateService)services.GetService(typeof(UserCommandStateService));
+            userCommandStateService.InitForUser(message.Author);
+            await channel.SendMessageAsync($"User state has been reset.  Sorry it didn't work out.");
         }
     }
 }

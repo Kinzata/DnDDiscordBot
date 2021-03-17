@@ -23,12 +23,6 @@ namespace DnDDiscordBot
             _client = client;
             _commands = commands;
             _services = services;
-
-            //_client.MessageReceived += HandleCommandAsync;
-            //_client.MessageReceived += HandleMessageAsync;
-            //_client.MessageUpdated += HandleMessageUpdatedAsync;
-
-            //_commands.CommandExecuted += OnCommandExecutedAsync;
         }
 
         public async Task InstallCommandsAsync()
@@ -39,7 +33,6 @@ namespace DnDDiscordBot
             _client.MessageUpdated += HandleMessageUpdatedAsync;
 
             _commands.CommandExecuted += OnCommandExecutedAsync;
-
 
             await _commands.AddModulesAsync(assembly: Assembly.GetEntryAssembly(),
                                             services: _services);

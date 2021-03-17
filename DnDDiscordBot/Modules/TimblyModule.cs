@@ -2,7 +2,6 @@
 using Discord.Commands;
 using DnDDiscordBot.Commands;
 using DnDDiscordBot.Extensions;
-using DnDDiscordBot.Submodules;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -30,11 +29,12 @@ namespace DnDDiscordBot.Modules
 
             var parser = new Parser(with => with.HelpWriter = null);
 
-            var parserResult = parser.ParseArguments<PingOptions, CharactersOptions>(list);
+            var parserResult = parser.ParseArguments<PingOptions, CharactersOptions, QuestOptions>(list);
             
             parserResult.MapResult(
               (PingOptions opts) => HandlePingMessage(opts),
               (CharactersOptions opts) => HandleCharacterMessage(opts, list).Result,
+              (QuestOptions opts) => HandleQuestMessage(opts, list).Result,
               errs => 1);
 
             await parserResult.HandleHelpRequestedErrorAsync(Context);
@@ -52,6 +52,14 @@ namespace DnDDiscordBot.Modules
             messageContents.RemoveAt(0); // Remove command that got us here
             await new CharactersCommand(_services).Execute(Context, options, messageContents);
             Console.WriteLine("Characters.");
+            return 1;
+        }
+
+        public async Task<int> HandleQuestMessage(QuestOptions options, List<string> messageContents)
+        {
+            messageContents.RemoveAt(0); // Remove command that got us here
+            await new QuestCommand(_services).Execute(Context, options, messageContents);
+            Console.WriteLine("Quest.");
             return 1;
         }
 

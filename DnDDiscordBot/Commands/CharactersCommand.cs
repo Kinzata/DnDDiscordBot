@@ -2,7 +2,6 @@
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using DnDDiscordBot.Commands;
 using DnDDiscordBot.Extensions;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.Models;
@@ -12,7 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace DnDDiscordBot.Submodules
+namespace DnDDiscordBot.Commands
 {
     [Verb("characters", aliases: new[] { "c", "char" }, HelpText = "Retrieve character data.")]
     public class CharactersOptions
@@ -43,7 +42,7 @@ namespace DnDDiscordBot.Submodules
         public bool Delete { get; set; }
 
         [Option("help", Default = false, Required = false, Hidden = true, HelpText = "This field is needed to allow help in subverbs.")]
-        private bool Help { get; set; }
+        public bool Help { get; set; }
 
         private readonly char[] delimiters = { ',', '-' };
 
@@ -100,7 +99,7 @@ namespace DnDDiscordBot.Submodules
         public static string HelpHeader => "c [ delete ]";
 
         [Option('n', "name", Default = null, Required = true,
-            HelpText = "Character Name")]
+            HelpText = "-n <character name> - Character to delete.")]
         public string CharacterName { get; set; }
     }
 

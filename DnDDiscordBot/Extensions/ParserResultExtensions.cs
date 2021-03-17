@@ -75,17 +75,24 @@ namespace DnDDiscordBot.Extensions
                     }
                 }
 
-                embedFieldList.Add(new EmbedFieldBuilder
+                if(!string.IsNullOrWhiteSpace(optionHelpText))
                 {
-                    Name = "__Valid Attributes__",
-                    Value = optionHelpText
-                });
+                    embedFieldList.Add(new EmbedFieldBuilder
+                    {
+                        Name = "__Valid Attributes__",
+                        Value = optionHelpText
+                    });
+                }
 
-                embedFieldList.Add(new EmbedFieldBuilder
+                if (!string.IsNullOrWhiteSpace(subcommandHelpText))
                 {
-                    Name = "__Subcommands__",
-                    Value = subcommandHelpText
-                });
+                    embedFieldList.Add(new EmbedFieldBuilder
+                    {
+                        Name = "__Subcommands__",
+                        Value = subcommandHelpText
+                    });
+                }
+
             }
             else
             {
