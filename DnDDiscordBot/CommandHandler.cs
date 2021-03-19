@@ -2,6 +2,7 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using DnDDiscordBot.Commands;
+using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.MessageHandlers.MessageReceived;
 using DnDDiscordBot.Services;
 using System;

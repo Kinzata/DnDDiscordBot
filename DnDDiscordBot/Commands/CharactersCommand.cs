@@ -2,6 +2,7 @@
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Extensions;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.Models;
@@ -125,7 +126,7 @@ namespace DnDDiscordBot.Commands
             }
 
             // Handle subcommands
-            if( messageContents.Count > 0 )
+            if ( messageContents.Count > 0 )
             {
                 var nextArg = messageContents[0];
 
@@ -136,7 +137,7 @@ namespace DnDDiscordBot.Commands
                     var parserResult = parser.ParseArguments<CharacterDeleteOptions, PingCommand>(messageContents);
 
                     parserResult.MapResult(
-                      (CharacterDeleteOptions opts) => HandleDeleteCharacterMessage(context, opts, roles).Result,
+                      (CharacterDeleteOptions opts) => ExecuteCommand(HandleDeleteCharacterMessage, context, opts, roles).Result,
                       errs => 1);
 
                     await parserResult.HandleHelpRequestedErrorAsync(context);
@@ -144,30 +145,32 @@ namespace DnDDiscordBot.Commands
                     return;
                 }
             }
-           
+
+            IEnumerable<LevelLog> logs = _levelLogService.RetrieveAllCharacterData();
+
             // CharacterName
             if (!string.IsNullOrWhiteSpace(args.CharacterName))
             {
-                await GetCharacterByName(context, args.CharacterName);
-                return;
+                logs = _levelLogService.FilterListByCharacterName(logs, args.CharacterName);
             }
-            else if (!string.IsNullOrWhiteSpace(args.UserName)) {
-                var user = await context.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstAsync();
-                await GetCharacterByUser(context, user);
+            
+            // Username
+            if (!string.IsNullOrWhiteSpace(args.UserName)) {
+                var user = await context.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstOrDefaultAsync();
+                logs = _levelLogService.FilterListByUser(logs, user);
             }
-            else if (args.Levels != null)
+            
+            // Levels
+            if (args.Levels != null)
             {
-                var logs = _levelLogService.RetrieveAllCharacterData().Where(log =>
+                logs = logs.Where(log =>
                        log.Level >= args.low
-                    && log.Level <= args.high)
-                    .ToList();
-                await SendCharacterDataToChannel(context, logs, args.Details);
+                    && log.Level <= args.high);
             }
-            else
-            {
-                var logs = _levelLogService.RetrieveAllCharacterData();
-                await SendCharacterDataToChannel(context, logs, args.Details);
-            }
+            
+            await SendCharacterDataToChannel(context, logs.ToList(), args.Details);
+
+            return;
         }
 
         //[Command("updateCache")]
@@ -333,7 +336,7 @@ namespace DnDDiscordBot.Commands
         {
             var channel = context.Channel;
 
-            var result = _levelLogService.GetCharacterData(characterName);
+            var result = _levelLogService.GetCharacterData(characterName).FirstOrDefault();
 
             if( result != null)
             {
@@ -382,13 +385,22 @@ namespace DnDDiscordBot.Commands
             }
         }
 
-        private async Task<int> HandleDeleteCharacterMessage(SocketCommandContext context, CharacterDeleteOptions options, IReadOnlyCollection<SocketRole> roles)
+        private async Task<int> HandleDeleteCharacterMessage(SocketCommandContext context, object commandOptions, IReadOnlyCollection<SocketRole> roles)
         {
+            var options = (CharacterDeleteOptions)commandOptions;
+
             // Check Role
             var hasPermissions = DiscordContextHelpers.UserHasRole(context.User, "Moderator");
 
             if( hasPermissions )
             {
+                var logs = _levelLogService.GetCharacterData(options.CharacterName);
+                if( logs.Count() > 1)
+                {
+                    var clarificationContext = logs.Select(l => l.CharacterName);
+                    throw new NeedUserClarificationException("Multiple characters found.", clarificationContext.ToList());
+                }
+
                 await _levelLogService.DeleteCharacterDataAsync(options.CharacterName);
 
                 await context.Message.Channel.SendMessageAsync("Done!  If that character existed... they don't anymore!");
@@ -396,6 +408,27 @@ namespace DnDDiscordBot.Commands
             else
             {
                 await context.Message.Channel.SendMessageAsync($"You must have the role \"Moderator\" to run this command.");
+            }
+
+            return 1;
+        }
+
+        public async Task<int> ExecuteCommand(Func<SocketCommandContext, object, IReadOnlyCollection<SocketRole>, Task<int>> commandFunc, SocketCommandContext context, object options, IReadOnlyCollection<SocketRole> roles)
+        {
+            try
+            {
+                await commandFunc(context, options, roles);
+            }
+            catch (NeedUserClarificationException ex)
+            {
+                var embed = new EmbedBuilder
+                {
+                    Title = $"Clarification Needed!",
+                    Footer = new EmbedFooterBuilder { Text = "Requested by Timbly" },
+                    Timestamp = DateTime.Now
+                };
+                embed.AddField(ex.Message, string.Join("\n", ex.ClarificationContext));
+                await context.Channel.SendMessageAsync("", embed: embed.Build());
             }
 
             return 1;

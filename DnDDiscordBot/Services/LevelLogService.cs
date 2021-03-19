@@ -97,13 +97,36 @@ namespace DnDDiscordBot.Services
             }
         }
 
-        public LevelLog GetCharacterData(string characterName)
+        public IEnumerable<LevelLog> GetCharacterData(string characterName)
         {
-            var character = _characterLevels.Select(row => row.Value).Where(log => log.SearchFieldCharacterName == characterName.ToLower()).FirstOrDefault();
+            var characters = _characterLevels.Select(row => row.Value)
+                .Where(log => log.SearchFieldCharacterName.Contains(characterName.ToLower()));
             
             // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
             
-            return character;
+            return characters;
+        }
+
+        public IEnumerable<LevelLog> FilterListByCharacterName(IEnumerable<LevelLog> list, string characterName)
+        {
+            list = list.Where(log => log.SearchFieldCharacterName.Contains(characterName.ToLower()));
+
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+
+            return list;
+        }
+
+        public IEnumerable<LevelLog> FilterListByUser(IEnumerable<LevelLog> list, IGuildUser user)
+        {
+            if( user == null)
+            {
+                return new List<LevelLog>();
+            }
+            list = list.Where(log => log.UserId == user.Id);
+
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+
+            return list;
         }
 
         public LevelLog[] GetCharacterData(ulong userId)
