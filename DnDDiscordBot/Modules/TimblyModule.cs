@@ -1,9 +1,7 @@
 ﻿using CommandLine;
-using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
 using DnDDiscordBot.Commands;
-using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Extensions;
 using DnDDiscordBot.Models;
 using System;
@@ -53,6 +51,7 @@ namespace DnDDiscordBot.Modules
                 errs => 1);
 
             await parserResult.HandleHelpRequestedErrorAsync(Context);
+            await parserResult.HandleMissingRequiredArgumentErrorAsync(actionContext.DiscordContext);
 
         }
 

@@ -18,6 +18,10 @@ namespace DnDDiscordBot.Commands
         [Option('n', "name", Default = null, Required = true, 
             HelpText = "-n <character1> <character2> [character3...] - Characters to merge.")]
         public IEnumerable<string> CharacterName { get; set; }
+
+        [Option('u', "username", Default = null, Required = false,
+            HelpText = "-u <discord username> - User qualifier; Moderator only")]
+        public string UserName { get; set; }
     }
 
     // Subcommand of CharactersCommand
@@ -34,10 +38,30 @@ namespace DnDDiscordBot.Commands
         {
             var args = (MergeCharactersOptions)commandArgs;
             var discordContext = actionContext.DiscordContext;
-
             var characterNames = args.CharacterName;
 
-            var levelLogs = _levelLogService.GetCharacterData(discordContext.User.Id);
+            var userId = discordContext.User.Id;
+
+            if ( !string.IsNullOrWhiteSpace(args.UserName))
+            {
+                // Check roll for Moderator
+                var hasPermissions = DiscordContextHelpers.UserHasRole(discordContext.User, "Moderator");
+                if( !hasPermissions)
+                {
+                    await discordContext.Message.Channel.SendMessageAsync($"You must have the role \"Moderator\" to run this command with User specified.");
+                    return;
+                }
+
+                var user = await DiscordContextHelpers.GetUser(discordContext, args.UserName);
+                if( user == null)
+                {
+                    throw new NeedUserClarificationException("User not found.", new List<string> { args.UserName });
+                }
+
+                userId = user.Id;
+            }
+
+            var levelLogs = _levelLogService.GetCharacterData(userId);
 
             var charactersToMerge = new List<LevelLog>();
 

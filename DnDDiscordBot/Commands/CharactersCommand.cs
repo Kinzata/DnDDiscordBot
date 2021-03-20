@@ -135,6 +135,7 @@ namespace DnDDiscordBot.Commands
                       errs => 1);
 
                     await parserResult.HandleHelpRequestedErrorAsync(actionContext.DiscordContext);
+                    await parserResult.HandleMissingRequiredArgumentErrorAsync(actionContext.DiscordContext);
 
                     return;
                 }
@@ -150,7 +151,7 @@ namespace DnDDiscordBot.Commands
             
             // Username
             if (!string.IsNullOrWhiteSpace(args.UserName)) {
-                var user = await discordContext.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstOrDefaultAsync();
+                var user = await DiscordContextHelpers.GetUser(discordContext, args.UserName);
                 logs = _levelLogService.FilterListByUser(logs, user);
             }
             
