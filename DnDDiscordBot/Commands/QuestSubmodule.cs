@@ -36,17 +36,20 @@ namespace DnDDiscordBot.Commands
         public bool Help { get; set; }
     }
 
-    public class QuestCommand
+    public class QuestCommand : BaseCommand
     {
         private UserCommandStateService _userCommandStateService;
 
-        public QuestCommand(IServiceProvider services)
+        public QuestCommand(IServiceProvider services) : base(services)
         {
             _userCommandStateService = (UserCommandStateService)services.GetService(typeof(UserCommandStateService));
         }
 
-        public async Task Execute(SocketCommandContext context, QuestOptions args, List<string> messageContents)
+        public override async Task Execute(object commandArgs, DndActionContext actionContext)
         {
+            var messageContents = actionContext.MessageContents;
+            var discordContext = actionContext.DiscordContext;
+
             // Handle subcommands
             if (messageContents.Count > 0)
             {
@@ -59,10 +62,10 @@ namespace DnDDiscordBot.Commands
                     var parserResult = parser.ParseArguments<QuestCreateOptions, PingCommand>(messageContents);
 
                     parserResult.MapResult(
-                      (QuestCreateOptions opts) => HandleCreateQuestMessage(context, opts).Result,
+                      (QuestCreateOptions opts) => HandleCreateQuestMessage(discordContext, opts).Result,
                       errs => 1);
 
-                    await parserResult.HandleHelpRequestedErrorAsync(context);
+                    await parserResult.HandleHelpRequestedErrorAsync(discordContext);
 
                     return;
                 }

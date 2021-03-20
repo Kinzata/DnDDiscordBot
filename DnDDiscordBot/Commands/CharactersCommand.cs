@@ -94,36 +94,26 @@ namespace DnDDiscordBot.Commands
         }
     }
 
-    [Verb("delete", HelpText = "Retrieve character data.")]
-    public class CharacterDeleteOptions
+    public class CharactersCommand : BaseCommand
     {
-        public static string HelpHeader => "c [ delete ]";
-
-        [Option('n', "name", Default = null, Required = true,
-            HelpText = "-n <character name> - Character to delete.")]
-        public string CharacterName { get; set; }
-    }
-
-    public class CharactersCommand
-    {
+        private readonly IServiceProvider _serviceProvider;
         private readonly LevelLogService _levelLogService;
 
         private const string LEVEL_LOG_CHANNEL = "level-up-log";
 
-        public CharactersCommand(IServiceProvider services)
+        public CharactersCommand(IServiceProvider services) : base(services)
         {
+            _serviceProvider = services;
             _levelLogService = (LevelLogService)services.GetService(typeof(LevelLogService));
         }
 
-        public async Task Execute(SocketCommandContext context, CharactersOptions args, List<string> messageContents)
+        public override async Task Execute(object commandArgs, DndActionContext actionContext)
         {
-            // Set up roles for future use
-            IReadOnlyCollection<SocketRole> roles = null;
+            var args = (CharactersOptions)commandArgs;
 
-            if (context.User is SocketGuildUser gUser)
-            {
-                roles = gUser.Roles;
-            }
+            var roles = actionContext.Roles;
+            var messageContents = actionContext.MessageContents;
+            var discordContext = actionContext.DiscordContext;
 
             // Handle subcommands
             if ( messageContents.Count > 0 )
@@ -137,10 +127,10 @@ namespace DnDDiscordBot.Commands
                     var parserResult = parser.ParseArguments<CharacterDeleteOptions, PingCommand>(messageContents);
 
                     parserResult.MapResult(
-                      (CharacterDeleteOptions opts) => ExecuteCommand(HandleDeleteCharacterMessage, context, opts, roles).Result,
+                      (CharacterDeleteOptions opts) => SafeCommandExecutor.ExecuteCommand(new DeleteCharacterCommand(_serviceProvider), opts, actionContext).Result,
                       errs => 1);
 
-                    await parserResult.HandleHelpRequestedErrorAsync(context);
+                    await parserResult.HandleHelpRequestedErrorAsync(actionContext.DiscordContext);
 
                     return;
                 }
@@ -156,7 +146,7 @@ namespace DnDDiscordBot.Commands
             
             // Username
             if (!string.IsNullOrWhiteSpace(args.UserName)) {
-                var user = await context.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstOrDefaultAsync();
+                var user = await discordContext.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstOrDefaultAsync();
                 logs = _levelLogService.FilterListByUser(logs, user);
             }
             
@@ -168,7 +158,7 @@ namespace DnDDiscordBot.Commands
                     && log.Level <= args.high);
             }
             
-            await SendCharacterDataToChannel(context, logs.ToList(), args.Details);
+            await SendCharacterDataToChannel(discordContext, logs.ToList(), args.Details);
 
             return;
         }
@@ -383,55 +373,6 @@ namespace DnDDiscordBot.Commands
             {
                 await channel.SendMessageAsync($"No characters found for \"{user.Username}\".");
             }
-        }
-
-        private async Task<int> HandleDeleteCharacterMessage(SocketCommandContext context, object commandOptions, IReadOnlyCollection<SocketRole> roles)
-        {
-            var options = (CharacterDeleteOptions)commandOptions;
-
-            // Check Role
-            var hasPermissions = DiscordContextHelpers.UserHasRole(context.User, "Moderator");
-
-            if( hasPermissions )
-            {
-                var logs = _levelLogService.GetCharacterData(options.CharacterName);
-                if( logs.Count() > 1)
-                {
-                    var clarificationContext = logs.Select(l => l.CharacterName);
-                    throw new NeedUserClarificationException("Multiple characters found.", clarificationContext.ToList());
-                }
-
-                await _levelLogService.DeleteCharacterDataAsync(options.CharacterName);
-
-                await context.Message.Channel.SendMessageAsync("Done!  If that character existed... they don't anymore!");
-            }
-            else
-            {
-                await context.Message.Channel.SendMessageAsync($"You must have the role \"Moderator\" to run this command.");
-            }
-
-            return 1;
-        }
-
-        public async Task<int> ExecuteCommand(Func<SocketCommandContext, object, IReadOnlyCollection<SocketRole>, Task<int>> commandFunc, SocketCommandContext context, object options, IReadOnlyCollection<SocketRole> roles)
-        {
-            try
-            {
-                await commandFunc(context, options, roles);
-            }
-            catch (NeedUserClarificationException ex)
-            {
-                var embed = new EmbedBuilder
-                {
-                    Title = $"Clarification Needed!",
-                    Footer = new EmbedFooterBuilder { Text = "Requested by Timbly" },
-                    Timestamp = DateTime.Now
-                };
-                embed.AddField(ex.Message, string.Join("\n", ex.ClarificationContext));
-                await context.Channel.SendMessageAsync("", embed: embed.Build());
-            }
-
-            return 1;
         }
     }
 }

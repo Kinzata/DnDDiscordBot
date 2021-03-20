@@ -1,12 +1,13 @@
 ﻿using CommandLine;
 using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
 using DnDDiscordBot.Commands;
 using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Extensions;
+using DnDDiscordBot.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Modules
@@ -30,66 +31,31 @@ namespace DnDDiscordBot.Modules
             var list = new List<string>(args);
             list.RemoveAt(0); // Remove command that got us here
 
+            var actionContext = new DndActionContext
+            {
+                DiscordContext = Context,
+                MessageContents = list
+            };
+
+            if (Context.User is SocketGuildUser gUser)
+            {
+                actionContext.Roles = gUser.Roles;
+            }
+
             var parser = new Parser(with => with.HelpWriter = null);
 
             var parserResult = parser.ParseArguments<PingOptions, CharactersOptions, QuestOptions>(list);
 
             parserResult.MapResult(
-                (PingOptions opts) => ExecuteCommand(HandlePingMessage, opts, list).Result,
-                (CharactersOptions opts) => ExecuteCommand(HandleCharacterMessage, opts, list).Result,
-                (QuestOptions opts) => ExecuteCommand(HandleQuestMessage, opts, list).Result,
+                (PingOptions opts) => SafeCommandExecutor.ExecuteCommand(new PingCommand(_services), opts, actionContext).Result,
+                (CharactersOptions opts) => SafeCommandExecutor.ExecuteCommand(new CharactersCommand(_services), opts, actionContext).Result,
+                (QuestOptions opts) => SafeCommandExecutor.ExecuteCommand(new QuestCommand(_services), opts, actionContext).Result,
                 errs => 1);
 
             await parserResult.HandleHelpRequestedErrorAsync(Context);
 
         }
 
-        public Task<int> HandlePingMessage(object commandOptions, List<string> messageContents)
-        {
-            var options = (PingOptions)commandOptions;
-            new PingCommand().Execute(Context, options);
-            return Task.FromResult(1);
-        }
 
-        public async Task<int> HandleCharacterMessage(object commandOptions, List<string> messageContents)
-        {
-            var options = (CharactersOptions)commandOptions;
-
-            messageContents.RemoveAt(0); // Remove command that got us here
-            await new CharactersCommand(_services).Execute(Context, options, messageContents);
-            Console.WriteLine("Characters.");
-            return 1;
-        }
-
-        public async Task<int> HandleQuestMessage(object commandOptions, List<string> messageContents)
-        {
-            var options = (QuestOptions)commandOptions;
-
-            messageContents.RemoveAt(0); // Remove command that got us here
-            await new QuestCommand(_services).Execute(Context, options, messageContents);
-            Console.WriteLine("Quest.");
-            return 1;
-        }
-
-        public async Task<int> ExecuteCommand(Func<object, List<string>, Task<int>> commandFunc, object options, List<string> messageContents)
-        {
-            try
-            {
-                await commandFunc(options, messageContents);
-            }
-            catch (NeedUserClarificationException ex )
-            {
-                var embed = new EmbedBuilder
-                {
-                    Title = $"Clarification Needed!",
-                    Footer = new EmbedFooterBuilder { Text = "Requested by Timbly" },
-                    Timestamp = DateTime.Now
-                };
-                embed.AddField(ex.Message, string.Join("\n", ex.ClarificationContext));
-                await Context.Channel.SendMessageAsync("", embed: embed.Build());
-            }
-
-            return 1;
-        }
     }
 }
