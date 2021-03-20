@@ -1,28 +1,44 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using DnDDiscordBot.Models;
 using DnDDiscordBot.Services;
 using System;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.MessageHandlers.MessageReceived
 {
-    public class LevelLogMessageHandler
+    public class LevelLogMessageHandler : BaseMessageHandler
     {
-        public async Task ExecuteAsync(SocketUserMessage message, IServiceProvider services)
+        private IServiceProvider _services;
+
+        public LevelLogMessageHandler(IServiceProvider services) : base(services)
         {
-            var levelLogService = (LevelLogService)services.GetService(typeof(LevelLogService));
+            _services = services;
+        }
+
+        public override async Task Execute(SocketUserMessage message)
+        {
+            var levelLogService = (LevelLogService)_services.GetService(typeof(LevelLogService));
 
             await Task.Run(async () =>
             {
-                var wasParsed = await levelLogService.HandleMessage(message, true);
+                try
+                {
+                    var wasParsed = await levelLogService.HandleMessage(message, true);
 
-                if (!wasParsed)
+                    if (!wasParsed)
+                    {
+                        await message.AddReactionAsync(new Emoji("❌"));
+                    }
+                    else
+                    {
+                        await message.AddReactionAsync(new Emoji("✅"));
+                    }
+                }
+                catch (Exception ex)
                 {
                     await message.AddReactionAsync(new Emoji("❌"));
-                }
-                else
-                {
-                    await message.AddReactionAsync(new Emoji("✅"));
+                    throw ex;
                 }
             });
         }

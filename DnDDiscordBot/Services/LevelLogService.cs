@@ -1,4 +1,5 @@
 ﻿using Discord;
+using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Models;
 using Newtonsoft.Json;
 using System;
@@ -66,11 +67,27 @@ namespace DnDDiscordBot.Services
         /// <summary>
         /// Stores the LevelLog only if it is a new character, or updates the existing record if one already exists but is a lower level
         /// </summary>
-        /// <param name="log"></param>
         /// <returns>True/False - Whether the existing record was updated</returns>
         private bool TryUpdateExistingRecord(LevelLog log, out LevelLog existingRecord)
         {
-            existingRecord = _characterLevels.Where(record => record.Value.CharacterName == log.CharacterName).Select(record => record.Value).FirstOrDefault();
+            var existingRecords = _characterLevels
+                // User Ids match
+                .Where(r => r.Value.UserId == log.UserId)
+                // One of the names contains the other
+                .Where(r => r.Value.SearchFieldCharacterName.Contains(log.SearchFieldCharacterName) || log.SearchFieldCharacterName.Contains(r.Value.SearchFieldCharacterName))
+                .Select(r => r.Value)
+                .ToList();
+
+            if( existingRecords.Count() <= 1)
+            {
+                existingRecord = existingRecords.FirstOrDefault();
+            }
+            else
+            {
+                var clarificationContext = existingRecords.Select(l => l.CharacterName);
+                throw new NeedUserClarificationException("Multiple character records exist.  Please merge them using `TBD`.", clarificationContext.ToList());
+            }
+                
             if (existingRecord != null)
             {
                 // Check if level is higher

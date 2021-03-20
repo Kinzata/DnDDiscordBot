@@ -1,8 +1,6 @@
 ﻿using CommandLine;
 using Discord;
 using Discord.Commands;
-using Discord.WebSocket;
-using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Extensions;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.Models;
