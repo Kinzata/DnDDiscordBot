@@ -40,6 +40,11 @@ namespace DnDDiscordBot.Commands
             HelpText = "Delete a character")]
         public bool Delete { get; set; }
 
+        [Subcommand]
+        [Option("merge", Default = false, Required = false,
+    HelpText = "Merge character data with others.")]
+        public bool Merge { get; set; }
+
         [Option("help", Default = false, Required = false, Hidden = true, HelpText = "This field is needed to allow help in subverbs.")]
         public bool Help { get; set; }
 

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Commands
 {
-    [Verb("merge", HelpText = "Merge character data with another.")]
+    [Verb("merge", HelpText = "Merge character data with others.")]
     public class MergeCharactersOptions
     {
         public static string HelpHeader => "c [ merge ]";
