@@ -19,6 +19,7 @@ namespace DnDDiscordBot.Commands
         public string CharacterName { get; set; }
     }
 
+    // Subcommand of CharactersCommand
     public class DeleteCharacterCommand : BaseCommand
     {
         private readonly LevelLogService _levelLogService;

@@ -43,11 +43,7 @@ namespace DnDDiscordBot.Services
 
                 if( existingRecord == null )
                 {
-                    _characterLevels.Add(levelLog.Guid, levelLog);
-                    if (shouldSaveToDB)
-                    {
-                        await _dynamoService.InsertCharacterAsync(levelLog);
-                    }
+                    await SaveLevelLog(levelLog, shouldSaveToDB);
                 }
                 else
                 {
@@ -62,6 +58,15 @@ namespace DnDDiscordBot.Services
             }
 
             return isParsed;
+        }
+
+        public async Task SaveLevelLog(LevelLog log, bool shouldSaveToDB = false)
+        {
+            _characterLevels.Add(log.Guid, log);
+            if (shouldSaveToDB)
+            {
+                await _dynamoService.InsertCharacterAsync(log);
+            }
         }
 
         /// <summary>
@@ -194,7 +199,7 @@ namespace DnDDiscordBot.Services
         /// Updates local cache of character data only
         /// </summary>
         /// <param name="logs"></param>
-        private void UpdateLocalCache()
+        public void UpdateLocalCache()
         {
             var jsonString = JsonConvert.SerializeObject(_characterLevels);
 

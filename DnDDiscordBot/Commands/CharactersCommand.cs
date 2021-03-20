@@ -15,7 +15,7 @@ namespace DnDDiscordBot.Commands
     [Verb("characters", aliases: new[] { "c", "char" }, HelpText = "Retrieve character data.")]
     public class CharactersOptions
     {
-        public static string[] Subcommands => new string[] {"delete"};
+        public static string[] Subcommands => new string[] {"delete", "merge"};
 
         public static string HelpHeader => "!timbly <__characters | c | char__> [args]";
 
@@ -122,10 +122,11 @@ namespace DnDDiscordBot.Commands
                 {
                     var parser = new Parser(with => with.HelpWriter = null);
 
-                    var parserResult = parser.ParseArguments<CharacterDeleteOptions, PingCommand>(messageContents);
+                    var parserResult = parser.ParseArguments<CharacterDeleteOptions, MergeCharactersOptions>(messageContents);
 
                     parserResult.MapResult(
                       (CharacterDeleteOptions opts) => SafeCommandExecutor.ExecuteCommand(new DeleteCharacterCommand(_serviceProvider), opts, actionContext).Result,
+                      (MergeCharactersOptions opts) => SafeCommandExecutor.ExecuteCommand(new MergeCharactersSubCommand(_serviceProvider), opts, actionContext).Result,
                       errs => 1);
 
                     await parserResult.HandleHelpRequestedErrorAsync(actionContext.DiscordContext);
