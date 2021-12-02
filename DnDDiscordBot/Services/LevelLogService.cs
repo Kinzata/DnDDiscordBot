@@ -90,7 +90,7 @@ namespace DnDDiscordBot.Services
             else
             {
                 var clarificationContext = existingRecords.Select(l => l.CharacterName);
-                throw new NeedUserClarificationException("Multiple character records exist.  Please merge them using `TBD`.", clarificationContext.ToList());
+                throw new NeedUserClarificationException("Multiple character records exist.  Please merge them using `!timbly c merge --help`.", clarificationContext.ToList());
             }
                 
             if (existingRecord != null)
