@@ -48,6 +48,9 @@ namespace DnDDiscordBot.Commands
         [Option("help", Default = false, Required = false, Hidden = true, HelpText = "This field is needed to allow help in subverbs.")]
         public bool Help { get; set; }
 
+        [Option('p', "pick", Default = "", Required = false, Hidden = true, HelpText = "This field is needed to allow pick in subverbs.")]
+        public string Pick { get; set; }
+
         private readonly char[] delimiters = { ',', '-' };
 
         public int low

@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Commands
 {
-    [Verb("quest", aliases: new[] { "q" }, HelpText = "Quest related commands.")]
+    [Verb("quest", aliases: new[] { "q" }, HelpText = "Quest related commands. WORK IN PROGRESS")]
     public class QuestOptions
     {
         public static string[] Subcommands => new string[] { "create" };

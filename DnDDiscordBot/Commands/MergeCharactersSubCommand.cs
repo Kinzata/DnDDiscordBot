@@ -1,4 +1,5 @@
 ﻿using CommandLine;
+using Discord;
 using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.Models;
@@ -18,6 +19,10 @@ namespace DnDDiscordBot.Commands
         [Option('n', "name", Default = null, Required = true, 
             HelpText = "-n <character1> <character2> [character3...] - Characters to merge.")]
         public IEnumerable<string> CharacterName { get; set; }
+
+        [Option('p', "pick", Default = null, Required = true,
+            HelpText = "-p <existing name to use> - The name from the provided list that you want as the final record.  Must be one from the list.")]
+        public string FinalChoiceCharacterName { get; set; }
 
         [Option('u', "username", Default = null, Required = false,
             HelpText = "-u <discord username> - User qualifier; Moderator only")]
@@ -39,6 +44,7 @@ namespace DnDDiscordBot.Commands
             var args = (MergeCharactersOptions)commandArgs;
             var discordContext = actionContext.DiscordContext;
             var characterNames = args.CharacterName;
+            var pickedName = args.FinalChoiceCharacterName;
 
             var userId = discordContext.User.Id;
 
@@ -78,14 +84,18 @@ namespace DnDDiscordBot.Commands
             var mergedLevelLog = new LevelLog();
 
             // Get the longest name
-            var log = charactersToMerge.OrderByDescending(l => l.CharacterName.Length).First();
+            var log = charactersToMerge.Where(l => l.CharacterName == pickedName).FirstOrDefault();
+            if (log == null)
+            {
+                throw new NeedUserClarificationException("Character name you wish to use was not matched to a selected record.  Please check that you didn't mistype it.", new List<string> { pickedName });
+            }
             mergedLevelLog.CharacterName = log.CharacterName;
 
             // Get the highest level
             log = charactersToMerge.OrderByDescending(l => l.Level).First();
             mergedLevelLog.Level = log.Level;
 
-            mergedLevelLog.UserId = discordContext.User.Id;
+            mergedLevelLog.UserId = userId;
             mergedLevelLog.Guid = Guid.NewGuid().ToString();
 
             // Delete the other ones
@@ -97,6 +107,15 @@ namespace DnDDiscordBot.Commands
             await _levelLogService.SaveLevelLog(mergedLevelLog, true);
 
             _levelLogService.UpdateLocalCache();
+
+            var embed = new EmbedBuilder
+            {
+                Title = $"Characters merged!",
+                Footer = new EmbedFooterBuilder { Text = "Recorded by Timbly" },
+                Timestamp = DateTime.Now
+            };
+            embed.AddField("All provided names have been removed with a new record recorded for:", pickedName);
+            await actionContext.DiscordContext.Channel.SendMessageAsync("", embed: embed.Build());
 
             return;
         }
