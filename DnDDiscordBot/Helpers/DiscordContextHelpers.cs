@@ -3,6 +3,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Helpers
 {
@@ -32,6 +33,11 @@ namespace DnDDiscordBot.Helpers
             }
 
             return false;
+        }
+
+        public static async Task<IGuildUser> GetUser(SocketCommandContext context, string username)
+        {
+            return await context.Guild.GetUsersAsync().Flatten().Where(u => u.Username == username).FirstOrDefaultAsync();
         }
     }
 }

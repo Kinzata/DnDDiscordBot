@@ -38,6 +38,8 @@ namespace DnDDiscordBot
 			await _client.LoginAsync(TokenType.Bot, token);
 			await _client.StartAsync();
 
+			await _client.SetGameAsync("!timbly help");
+
 
 			await Task.Delay(-1);
 		}

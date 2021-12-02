@@ -1,4 +1,5 @@
 ﻿using Discord;
+using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.Models;
 using Newtonsoft.Json;
 using System;
@@ -42,11 +43,7 @@ namespace DnDDiscordBot.Services
 
                 if( existingRecord == null )
                 {
-                    _characterLevels.Add(levelLog.Guid, levelLog);
-                    if (shouldSaveToDB)
-                    {
-                        await _dynamoService.InsertCharacterAsync(levelLog);
-                    }
+                    await SaveLevelLog(levelLog, shouldSaveToDB);
                 }
                 else
                 {
@@ -63,14 +60,39 @@ namespace DnDDiscordBot.Services
             return isParsed;
         }
 
+        public async Task SaveLevelLog(LevelLog log, bool shouldSaveToDB = false)
+        {
+            _characterLevels.Add(log.Guid, log);
+            if (shouldSaveToDB)
+            {
+                await _dynamoService.InsertCharacterAsync(log);
+            }
+        }
+
         /// <summary>
         /// Stores the LevelLog only if it is a new character, or updates the existing record if one already exists but is a lower level
         /// </summary>
-        /// <param name="log"></param>
         /// <returns>True/False - Whether the existing record was updated</returns>
         private bool TryUpdateExistingRecord(LevelLog log, out LevelLog existingRecord)
         {
-            existingRecord = _characterLevels.Where(record => record.Value.CharacterName == log.CharacterName).Select(record => record.Value).FirstOrDefault();
+            var existingRecords = _characterLevels
+                // User Ids match
+                .Where(r => r.Value.UserId == log.UserId)
+                // One of the names contains the other
+                .Where(r => r.Value.SearchFieldCharacterName.Contains(log.SearchFieldCharacterName) || log.SearchFieldCharacterName.Contains(r.Value.SearchFieldCharacterName))
+                .Select(r => r.Value)
+                .ToList();
+
+            if( existingRecords.Count() <= 1)
+            {
+                existingRecord = existingRecords.FirstOrDefault();
+            }
+            else
+            {
+                var clarificationContext = existingRecords.Select(l => l.CharacterName);
+                throw new NeedUserClarificationException("Multiple character records exist.  Please merge them using `!timbly c merge --help`.", clarificationContext.ToList());
+            }
+                
             if (existingRecord != null)
             {
                 // Check if level is higher
@@ -97,13 +119,36 @@ namespace DnDDiscordBot.Services
             }
         }
 
-        public LevelLog GetCharacterData(string characterName)
+        public IEnumerable<LevelLog> GetCharacterData(string characterName)
         {
-            var character = _characterLevels.Select(row => row.Value).Where(log => log.SearchFieldCharacterName == characterName.ToLower()).FirstOrDefault();
+            var characters = _characterLevels.Select(row => row.Value)
+                .Where(log => log.SearchFieldCharacterName.Contains(characterName.ToLower()));
             
             // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
             
-            return character;
+            return characters;
+        }
+
+        public IEnumerable<LevelLog> FilterListByCharacterName(IEnumerable<LevelLog> list, string characterName)
+        {
+            list = list.Where(log => log.SearchFieldCharacterName.Contains(characterName.ToLower()));
+
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+
+            return list;
+        }
+
+        public IEnumerable<LevelLog> FilterListByUser(IEnumerable<LevelLog> list, IGuildUser user)
+        {
+            if( user == null)
+            {
+                return new List<LevelLog>();
+            }
+            list = list.Where(log => log.UserId == user.Id);
+
+            // Maybe put a check here if we don't find the character to check if it's in the DB.  Also... handle duplicates?
+
+            return list;
         }
 
         public LevelLog[] GetCharacterData(ulong userId)
@@ -154,7 +199,7 @@ namespace DnDDiscordBot.Services
         /// Updates local cache of character data only
         /// </summary>
         /// <param name="logs"></param>
-        private void UpdateLocalCache()
+        public void UpdateLocalCache()
         {
             var jsonString = JsonConvert.SerializeObject(_characterLevels);
 

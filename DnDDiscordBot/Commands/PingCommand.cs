@@ -1,5 +1,6 @@
 ﻿using CommandLine;
-using Discord.Commands;
+using DnDDiscordBot.Models;
+using System;
 using System.Threading.Tasks;
 
 namespace DnDDiscordBot.Commands
@@ -10,11 +11,15 @@ namespace DnDDiscordBot.Commands
         public static string HelpHeader => "!timbly ping";
     }
 
-    public class PingCommand
+    public class PingCommand : BaseCommand
     {
-        public Task Execute(SocketCommandContext context, PingOptions args)
+        public PingCommand(IServiceProvider services) : base(services)
         {
-            var channel = context.Channel;
+        }
+
+        public override Task Execute(object commandArgs, DndActionContext actionContext)
+        {
+            var channel = actionContext.DiscordContext.Channel;
 
             channel.SendMessageAsync("Pong!");
 

@@ -138,5 +138,53 @@ namespace DnDDiscordBot.Extensions
 
             await context.Channel.SendMessageAsync(embed: embed.Build());
         }
+
+        /// <summary>
+        /// Checks for any errors within the ParserResult and handles building and sending a message response back to Discord if
+        /// the error is a HelpRequestedError or HelpVerbRequestedError
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="context">SocketCommandContext</param>
+        public static async Task HandleMissingRequiredArgumentErrorAsync<T>(this ParserResult<T> result, SocketCommandContext context)
+        {
+            if (result.Errors.Count() > 0)
+            {
+                var argumentRequiredError = result.Errors.Where(e => e.Tag == ErrorType.MissingRequiredOptionError).FirstOrDefault();
+                if (argumentRequiredError != null)
+                {
+                    await HandleMissingRequiredOption(result, context, (MissingRequiredOptionError)argumentRequiredError);
+                }
+            }
+        }
+
+        private static async Task HandleMissingRequiredOption<T>(ParserResult<T> result, SocketCommandContext context, MissingRequiredOptionError error)
+        {
+            var argumentName = error.NameInfo.LongName;
+            var header = $"Argument: `{argumentName}` is required.";
+
+            var embedFieldList = new List<EmbedFieldBuilder>();
+
+            embedFieldList.Add(new EmbedFieldBuilder
+            {
+                Name = "More Help",
+                Value = "An underlined command signifies that the command has subcommands.\n" +
+"Type `!timbly <command> --help` for more info on a command.\n" +
+"In the case of subcommands: `!timbly <command> <subcommand> --help` for info on the subcommand."
+            });
+
+            var embed = new EmbedBuilder
+            {
+                Title = $"{header}",
+                Footer = new EmbedFooterBuilder { Text = "Arguments surrounded in angled brackets (<args>) are mandatory, while those surrounded in square brackets ([args]) are optional. In either case, don't include the brackets." },
+                Timestamp = DateTime.Now,
+            };
+
+            foreach (var field in embedFieldList)
+            {
+                embed.AddField(field);
+            }
+
+            await context.Channel.SendMessageAsync(embed: embed.Build());
+        }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using CommandLine;
 using Discord;
 using Discord.Commands;
-using Discord.WebSocket;
 using DnDDiscordBot.Extensions;
 using DnDDiscordBot.Helpers;
 using DnDDiscordBot.Models;
@@ -16,7 +15,7 @@ namespace DnDDiscordBot.Commands
     [Verb("characters", aliases: new[] { "c", "char" }, HelpText = "Retrieve character data.")]
     public class CharactersOptions
     {
-        public static string[] Subcommands => new string[] {"delete"};
+        public static string[] Subcommands => new string[] {"delete", "merge"};
 
         public static string HelpHeader => "!timbly <__characters | c | char__> [args]";
 
@@ -41,8 +40,16 @@ namespace DnDDiscordBot.Commands
             HelpText = "Delete a character")]
         public bool Delete { get; set; }
 
+        [Subcommand]
+        [Option("merge", Default = false, Required = false,
+    HelpText = "Merge character data with others.")]
+        public bool Merge { get; set; }
+
         [Option("help", Default = false, Required = false, Hidden = true, HelpText = "This field is needed to allow help in subverbs.")]
         public bool Help { get; set; }
+
+        [Option('p', "pick", Default = "", Required = false, Hidden = true, HelpText = "This field is needed to allow pick in subverbs.")]
+        public string Pick { get; set; }
 
         private readonly char[] delimiters = { ',', '-' };
 
@@ -93,39 +100,29 @@ namespace DnDDiscordBot.Commands
         }
     }
 
-    [Verb("delete", HelpText = "Retrieve character data.")]
-    public class CharacterDeleteOptions
+    public class CharactersCommand : BaseCommand
     {
-        public static string HelpHeader => "c [ delete ]";
-
-        [Option('n', "name", Default = null, Required = true,
-            HelpText = "-n <character name> - Character to delete.")]
-        public string CharacterName { get; set; }
-    }
-
-    public class CharactersCommand
-    {
+        private readonly IServiceProvider _serviceProvider;
         private readonly LevelLogService _levelLogService;
 
         private const string LEVEL_LOG_CHANNEL = "level-up-log";
 
-        public CharactersCommand(IServiceProvider services)
+        public CharactersCommand(IServiceProvider services) : base(services)
         {
+            _serviceProvider = services;
             _levelLogService = (LevelLogService)services.GetService(typeof(LevelLogService));
         }
 
-        public async Task Execute(SocketCommandContext context, CharactersOptions args, List<string> messageContents)
+        public override async Task Execute(object commandArgs, DndActionContext actionContext)
         {
-            // Set up roles for future use
-            IReadOnlyCollection<SocketRole> roles = null;
+            var args = (CharactersOptions)commandArgs;
 
-            if (context.User is SocketGuildUser gUser)
-            {
-                roles = gUser.Roles;
-            }
+            var roles = actionContext.Roles;
+            var messageContents = actionContext.MessageContents;
+            var discordContext = actionContext.DiscordContext;
 
             // Handle subcommands
-            if( messageContents.Count > 0 )
+            if ( messageContents.Count > 0 )
             {
                 var nextArg = messageContents[0];
 
@@ -133,41 +130,45 @@ namespace DnDDiscordBot.Commands
                 {
                     var parser = new Parser(with => with.HelpWriter = null);
 
-                    var parserResult = parser.ParseArguments<CharacterDeleteOptions, PingCommand>(messageContents);
+                    var parserResult = parser.ParseArguments<CharacterDeleteOptions, MergeCharactersOptions>(messageContents);
 
                     parserResult.MapResult(
-                      (CharacterDeleteOptions opts) => HandleDeleteCharacterMessage(context, opts, roles).Result,
+                      (CharacterDeleteOptions opts) => SafeCommandExecutor.ExecuteCommand(new DeleteCharacterCommand(_serviceProvider), opts, actionContext).Result,
+                      (MergeCharactersOptions opts) => SafeCommandExecutor.ExecuteCommand(new MergeCharactersSubCommand(_serviceProvider), opts, actionContext).Result,
                       errs => 1);
 
-                    await parserResult.HandleHelpRequestedErrorAsync(context);
+                    await parserResult.HandleHelpRequestedErrorAsync(actionContext.DiscordContext);
+                    await parserResult.HandleMissingRequiredArgumentErrorAsync(actionContext.DiscordContext);
 
                     return;
                 }
             }
-           
+
+            IEnumerable<LevelLog> logs = _levelLogService.RetrieveAllCharacterData();
+
             // CharacterName
             if (!string.IsNullOrWhiteSpace(args.CharacterName))
             {
-                await GetCharacterByName(context, args.CharacterName);
-                return;
+                logs = _levelLogService.FilterListByCharacterName(logs, args.CharacterName);
             }
-            else if (!string.IsNullOrWhiteSpace(args.UserName)) {
-                var user = await context.Guild.GetUsersAsync().Flatten().Where(u => u.Username == args.UserName).FirstAsync();
-                await GetCharacterByUser(context, user);
+            
+            // Username
+            if (!string.IsNullOrWhiteSpace(args.UserName)) {
+                var user = await DiscordContextHelpers.GetUser(discordContext, args.UserName);
+                logs = _levelLogService.FilterListByUser(logs, user);
             }
-            else if (args.Levels != null)
+            
+            // Levels
+            if (args.Levels != null)
             {
-                var logs = _levelLogService.RetrieveAllCharacterData().Where(log =>
+                logs = logs.Where(log =>
                        log.Level >= args.low
-                    && log.Level <= args.high)
-                    .ToList();
-                await SendCharacterDataToChannel(context, logs, args.Details);
+                    && log.Level <= args.high);
             }
-            else
-            {
-                var logs = _levelLogService.RetrieveAllCharacterData();
-                await SendCharacterDataToChannel(context, logs, args.Details);
-            }
+            
+            await SendCharacterDataToChannel(discordContext, logs.ToList(), args.Details);
+
+            return;
         }
 
         //[Command("updateCache")]
@@ -333,7 +334,7 @@ namespace DnDDiscordBot.Commands
         {
             var channel = context.Channel;
 
-            var result = _levelLogService.GetCharacterData(characterName);
+            var result = _levelLogService.GetCharacterData(characterName).FirstOrDefault();
 
             if( result != null)
             {
@@ -380,25 +381,6 @@ namespace DnDDiscordBot.Commands
             {
                 await channel.SendMessageAsync($"No characters found for \"{user.Username}\".");
             }
-        }
-
-        private async Task<int> HandleDeleteCharacterMessage(SocketCommandContext context, CharacterDeleteOptions options, IReadOnlyCollection<SocketRole> roles)
-        {
-            // Check Role
-            var hasPermissions = DiscordContextHelpers.UserHasRole(context.User, "Moderator");
-
-            if( hasPermissions )
-            {
-                await _levelLogService.DeleteCharacterDataAsync(options.CharacterName);
-
-                await context.Message.Channel.SendMessageAsync("Done!  If that character existed... they don't anymore!");
-            }
-            else
-            {
-                await context.Message.Channel.SendMessageAsync($"You must have the role \"Moderator\" to run this command.");
-            }
-
-            return 1;
         }
     }
 }

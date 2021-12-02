@@ -2,6 +2,7 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using DnDDiscordBot.Commands;
+using DnDDiscordBot.Exceptions;
 using DnDDiscordBot.MessageHandlers.MessageReceived;
 using DnDDiscordBot.Services;
 using System;
@@ -89,10 +90,9 @@ namespace DnDDiscordBot
             {
                 if( message.Channel.Name == LEVEL_LOG_CHANNEL )
                 {
-                    await new LevelLogMessageHandler().ExecuteAsync(message, _services);
+                    await SafeMessageHandler.HandleMessage(new LevelLogMessageHandler(_services), message);
                 }
             }
-
         }
 
         private async Task HandleMessageUpdatedAsync(Cacheable<IMessage, ulong> cache, SocketMessage newMessageParam, ISocketMessageChannel channel)
@@ -113,7 +113,7 @@ namespace DnDDiscordBot
             if (newMessage.Channel.Name == LEVEL_LOG_CHANNEL)
             {
                 await newMessage.RemoveAllReactionsAsync();
-                await new LevelLogMessageHandler().ExecuteAsync(newMessage, _services);
+                await SafeMessageHandler.HandleMessage(new LevelLogMessageHandler(_services), newMessage);
             }
         }
 
