@@ -10,10 +10,15 @@ namespace DnDDiscordBot.Models
         public string CharacterName { get; set; }
         public int Level { get; set; }
         public string SearchFieldCharacterName => CharacterName.ToLower();
+        public bool HasBannedSpell { get; set; }
+        public string BannedSpell { get; set; }
 
         public bool IsValid()
         {
-            return UserId != 0 && CharacterName != "" && Level != 0;
+            return UserId != 0
+                && CharacterName != "" 
+                && Level != 0 
+                && !HasBannedSpell;
         }
         public override string ToString()
         {

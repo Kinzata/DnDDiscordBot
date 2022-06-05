@@ -24,11 +24,18 @@ namespace DnDDiscordBot.MessageHandlers.MessageReceived
             {
                 try
                 {
-                    var wasParsed = await levelLogService.HandleMessage(message, true);
+                    var levelLog = await levelLogService.HandleMessage(message, true);
 
-                    if (!wasParsed)
+                    if (!levelLog.IsValid())
                     {
                         await message.AddReactionAsync(new Emoji("❌"));
+                        if( levelLog.HasBannedSpell )
+                        {
+                            if (Emote.TryParse("<:badmagic:983063368824946759>", out var emote))
+                            {
+                                await message.AddReactionAsync(emote);
+                            }
+                        }
                     }
                     else
                     {
