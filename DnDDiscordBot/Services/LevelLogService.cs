@@ -29,15 +29,12 @@ namespace DnDDiscordBot.Services
             return _characterLevels.OrderByDescending(record => record.Value.Level).Select(record => record.Value).ToList();
         }
 
-        public async Task<bool> HandleMessage(IMessage message, bool shouldSaveToDB = false)
+        public async Task<LevelLog> HandleMessage(IMessage message, bool shouldSaveToDB = false)
         {
-            var isParsed = false;
-
             var levelLog = ParseDiscordMessage(message);
             if (levelLog.IsValid())
             {
                 Console.WriteLine(levelLog.ToStringSafe());
-                isParsed = true;
 
                 var updated = TryUpdateExistingRecord(levelLog, out var existingRecord);
 
@@ -57,7 +54,7 @@ namespace DnDDiscordBot.Services
                 UpdateLocalCache();
             }
 
-            return isParsed;
+            return levelLog;
         }
 
         public async Task SaveLevelLog(LevelLog log, bool shouldSaveToDB = false)
@@ -215,6 +212,10 @@ namespace DnDDiscordBot.Services
             levelLog.CharacterName = ParseCharacterNameFromContent(message.Content);
             levelLog.Level = ParseLevelFromContent(message.Content);
 
+            string bannedSpell;
+            levelLog.HasBannedSpell = ParseForBannedSpellsFromContent(message.Content, out bannedSpell);
+            if( bannedSpell != "") { levelLog.BannedSpell = bannedSpell; }
+
             return levelLog;
         }
 
@@ -277,6 +278,28 @@ namespace DnDDiscordBot.Services
             }
 
             return int.Parse(level);
+        }
+
+        public bool ParseForBannedSpellsFromContent(string content, out string bannedSpell)
+        {
+            var bannedSpells = new string[] {
+                "silvery barbs"
+            };
+
+            content = content.ToLower();
+
+            var bannedSpellFound = false;
+            bannedSpell = "";
+
+            foreach (var spell in bannedSpells)
+            {
+                if (content.Contains(spell)) { 
+                    bannedSpellFound = true;
+                    bannedSpell = spell;
+                }
+            }
+
+            return bannedSpellFound;
         }
     }
 }

@@ -43,5 +43,19 @@ namespace DnDDiscordBotTests
 
             Assert.Equal(expectedTestResult, service.ParseLevelFromContent(content));
         }
+
+        [Theory]
+        [InlineData("<@asdfsd> as Doden 'Moonreaper' gains 500 xp from a quest and advances to level 3", false, "")]
+        [InlineData("<@asdfsd> as Yuki gains 0 xp to advance to level 7\nAdvancing to a total level of: 7 in Keeper's Pet\nRolling HP: 5\nNew HP: 45 + 5 + 2 = 52\nNew/improvement class feature: Nothing", false, "")]
+        [InlineData("<@asdfsd> as Yuki HP: 5\nNew HP: 45 + 5 + 2 = 52\nNew/improvement class feature: silvery barbs", true, "silvery barbs")]
+        [InlineData("<@asdfsd> as akljshfklaSilvery Barbslksjdf class feature: ", true, "silvery barbs")]
+        public void ParseForBannedSpells(string content, bool expectedTestResult, string expectedBannedSpell)
+        {
+            var service = new LevelLogService(null);
+
+            string bannedSpell;
+            Assert.Equal(expectedTestResult, service.ParseForBannedSpellsFromContent(content, out bannedSpell));
+            Assert.Equal(expectedBannedSpell, bannedSpell);
+        }
     }
 }
